@@ -40,16 +40,21 @@ function App() {
         body: JSON.stringify({ message: userMessage })
       })
 
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`)
+      }
+
       const data = await response.json()
       setMessages(prev => [...prev, { type: 'assistant', content: data.response }])
     } catch (error) {
       setMessages(prev => [...prev, {
         type: 'error',
-        content: 'Connection failed. Make sure the backend is running:\npython server.py'
+        content: `Connection failed: ${error.message}\n\nTroubleshooting:\n1. Check if the server is still starting up.\n2. Verify the backend logs on Render.\n3. Visit /health or /debug in your browser.`
       }])
     } finally {
       setLoading(false)
     }
+
   }
 
   const handleKeyDown = (e) => {

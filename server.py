@@ -105,6 +105,17 @@ async def reset():
     conversation_history = []
     return {"status": "reset_complete"}
 
+@app.get("/debug")
+async def debug():
+    return {
+        "status": "online",
+        "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
+        "gemini_key_set": bool(os.getenv("GEMINI_API_KEY")),
+        "python_version": sys.version,
+        "dist_exists": os.path.exists(dist_path),
+        "assets_exists": os.path.exists(os.path.join(dist_path, "assets"))
+    }
+
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     safe_filename = os.path.basename(filename)
