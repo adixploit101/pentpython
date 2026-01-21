@@ -16,9 +16,9 @@ report_*.md
 
 # Node / React
 ui/node_modules/
-ui/dist/
 ui/.env
 ui/.env.local
+
 
 # IDEs
 .vscode/
