@@ -116,17 +116,39 @@ async def download_file(filename: str):
 
 # Serve static files (React frontend)
 dist_path = os.path.join(os.getcwd(), "ui", "dist")
-if os.path.exists(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
 
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    if full_path.startswith("chat") or full_path.startswith("health") or full_path.startswith("history") or full_path.startswith("reset") or full_path.startswith("download"):
-        return None # Let FastAPI handle these
+@app.get("/")
+async def serve_index():
     index_file = os.path.join(dist_path, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"error": "Frontend build not found"}
+    return {"error": "Frontend build not found. Did you run npm run build?"}
+
+# Mount the assets directory specifically
+assets_path = os.path.join(dist_path, "assets")
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+# Catch-all for SPA routing (redirects to index.html for unknown routes)
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Skip API routes
+    if full_path.startswith(("chat", "health", "history", "reset", "download")):
+        raise HTTPException(status_code=404, detail="API route not found")
+        
+    # Check for other static files in dist root (like robots.txt, favicon.ico)
+    file_path = os.path.join(dist_path, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+        
+    # Default to index.html for SPA
+    index_file = os.path.join(dist_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    
+    raise HTTPException(status_code=404, detail="Not found")
+
+
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 8000))
