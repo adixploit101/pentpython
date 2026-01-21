@@ -1,0 +1,15 @@
+google-generativeai
+openai
+rich
+requests
+fastapi
+uvicorn
+pydantic
+python-multipart
+python-dotenv
+dnspython
+python-whois
+reportlab
+markdown2
+gunicorn
+uvicorn[standard]
