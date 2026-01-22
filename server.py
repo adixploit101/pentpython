@@ -160,7 +160,7 @@ async def download_file(filename: str):
 
 # --- STATIC FILE SERVING ---
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def serve_index():
     index_file = os.path.join(dist_path, "index.html")
     if os.path.exists(index_file):
@@ -170,6 +170,7 @@ async def serve_index():
         "details": f"Checked path: {index_file}",
         "advice": "Ensure ui/dist is uploaded to GitHub and not ignored."
     }
+
 
 assets_path = os.path.join(dist_path, "assets")
 if os.path.exists(assets_path):
