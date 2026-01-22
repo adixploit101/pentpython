@@ -55,6 +55,9 @@ Always maintain a professional, elite security posture.
 
 
 
+class FatalAPIError(Exception):
+    pass
+
 class PentAgentBase:
     def __init__(self):
         self.logs = []
