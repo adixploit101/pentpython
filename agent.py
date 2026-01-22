@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from utils import logger, print_agent_message, print_tool_output, print_system
 from tools import AVAILABLE_TOOLS, get_tool_definitions, GEMINI_TOOLS
+from exceptions import FatalAPIError
 
 # Lazy imports to avoid fatal errors if dependencies are missing during switch
 try:
@@ -55,8 +56,6 @@ Always maintain a professional, elite security posture.
 
 
 
-class FatalAPIError(Exception):
-    pass
 
 class PentAgentBase:
     def __init__(self):

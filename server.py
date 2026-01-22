@@ -14,7 +14,8 @@ import uvicorn
 import shutil
 
 # Local imports
-from agent import get_agent, FatalAPIError
+from exceptions import FatalAPIError
+from agent import get_agent
 
 # Setup basic logging to stderr for Render logs
 logging.basicConfig(level=logging.INFO)
