@@ -89,16 +89,9 @@ async def chat(request: ChatRequest):
         agent = get_agent()
     
     try:
-        output_buffer = io.StringIO()
-        with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-            try:
-                agent.run(request.message)
-            except FatalAPIError as e:
-                from agent import MockPentAgent
-                agent = MockPentAgent()
-                agent.run(request.message)
+        # Agent now returns logs directly
+        logs = agent.run(request.message)
         
-        logs = strip_ansi_codes(output_buffer.getvalue())
         if not logs:
             logs = "Agent executed but produced no output."
             
@@ -107,6 +100,7 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/health")
 async def health():

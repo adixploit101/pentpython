@@ -152,6 +152,14 @@ function App() {
           </div>
         )}
 
+        <div className="sidebar-header">
+          <div className="logo-container">
+            <div className="logo-spark"></div>
+            <h1>PentPython</h1>
+          </div>
+          <p className="subtitle">Unified Security AI <span style={{ fontSize: '0.7em', opacity: 0.5 }}>v1.2.0</span></p>
+        </div>
+
         <div className="input-container">
           <div className="input-header">
             <div className="pro-badge">⚡ PentPython Security Console</div>
