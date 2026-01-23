@@ -17,7 +17,8 @@ import shutil
 from exceptions import FatalAPIError
 from agent import get_agent
 
-# Setup basic logging to stderr for Render logs
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,10 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="PentPython API", version="1.1.0", lifespan=lifespan)
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "message": "Render service is up"}
 
 app.add_middleware(
     CORSMiddleware,
