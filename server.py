@@ -73,11 +73,17 @@ async def scan_website(request: WebsiteScanRequest):
         
         # Generate PDF report
         scan_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report = SecurityReport(
-            target=request.url,
-            scan_type="Website Security Scan",
-            vulnerabilities=results.get('vulnerabilities', [])
-        )
+        report = SecurityReport(target=request.url)
+        
+        # Add each vulnerability as a finding
+        for vuln in results.get('vulnerabilities', []):
+            report.add_finding(
+                title=vuln.get('type', 'Unknown'),
+                severity=vuln.get('severity', 'INFO'),
+                description=vuln.get('description', ''),
+                recommendation=vuln.get('remediation', ''),
+                category='Website Security'
+            )
         
         report_files = report.save()
         pdf_filename = os.path.basename(report_files['pdf'])
@@ -91,6 +97,7 @@ async def scan_website(request: WebsiteScanRequest):
     except Exception as e:
         logger.error(f"Website scan error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/scan/apk", response_model=ScanResponse)
 async def scan_apk(file: UploadFile = File(...)):
@@ -115,11 +122,17 @@ async def scan_apk(file: UploadFile = File(...)):
         results = scanner.scan()
         
         # Generate PDF report
-        report = SecurityReport(
-            target=file.filename,
-            scan_type="APK Security Analysis",
-            vulnerabilities=results.get('vulnerabilities', [])
-        )
+        report = SecurityReport(target=file.filename)
+        
+        # Add each vulnerability as a finding
+        for vuln in results.get('vulnerabilities', []):
+            report.add_finding(
+                title=vuln.get('type', 'Unknown'),
+                severity=vuln.get('severity', 'INFO'),
+                description=vuln.get('description', ''),
+                recommendation=vuln.get('remediation', ''),
+                category='APK Security'
+            )
         
         report_files = report.save()
         pdf_filename = os.path.basename(report_files['pdf'])
@@ -163,11 +176,17 @@ async def scan_project(file: UploadFile = File(...)):
         results = scanner.scan()
         
         # Generate PDF report
-        report = SecurityReport(
-            target=file.filename,
-            scan_type="Code Security Analysis",
-            vulnerabilities=results.get('vulnerabilities', [])
-        )
+        report = SecurityReport(target=file.filename)
+        
+        # Add each vulnerability as a finding
+        for vuln in results.get('vulnerabilities', []):
+            report.add_finding(
+                title=vuln.get('type', 'Unknown'),
+                severity=vuln.get('severity', 'INFO'),
+                description=vuln.get('description', ''),
+                recommendation=vuln.get('remediation', ''),
+                category='Code Security'
+            )
         
         report_files = report.save()
         pdf_filename = os.path.basename(report_files['pdf'])
