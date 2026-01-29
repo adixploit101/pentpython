@@ -1,206 +1,225 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import './App.css'
+import WebsiteScanner from './components/WebsiteScanner'
+import ApkScanner from './components/ApkScanner'
+import CodeScanner from './components/CodeScanner'
 
 const API_URL = ''
 
 function App() {
-  const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
+  const [activeTab, setActiveTab] = useState('website')
+  const [scanResults, setScanResults] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState('Connecting...')
-  const messagesEndRef = useRef(null)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  useEffect(() => {
-    fetch(`${API_URL}/health`)
-      .then(res => res.json())
-      .then(data => setStatus(`Active • ${data.agent_type}`))
-      .catch(() => setStatus('Offline'))
-  }, [])
-
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return
-
-    const userMessage = input
-    setInput('')
-    setMessages(prev => [...prev, { type: 'user', content: userMessage }])
-    setLoading(true)
-
-    try {
-      const response = await fetch(`${API_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      setMessages(prev => [...prev, { type: 'assistant', content: data.response }])
-    } catch (error) {
-      setMessages(prev => [...prev, {
-        type: 'error',
-        content: `Connection failed: ${error.message}\n\nTroubleshooting:\n1. Check if the server is still starting up.\n2. Verify the backend logs on Render.\n3. Visit /health or /debug in your browser.`
-      }])
-    } finally {
-      setLoading(false)
-    }
-
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  const quickActions = [
-    { icon: '🔍', text: 'Scan a website', action: 'Do a security scan of ' },
-    { icon: '🔐', text: 'Check SSL', action: 'Check SSL certificate for ' },
-    { icon: '🌐', text: 'DNS Lookup', action: 'Do a DNS lookup for ' },
-    { icon: '🛡️', text: 'Full Audit', action: 'Do a complete security audit of ' },
+  const tabs = [
+    { id: 'website', name: 'Website Scanner', icon: '🌐' },
+    { id: 'apk', name: 'APK Scanner', icon: '📱' },
+    { id: 'code', name: 'Code Scanner', icon: '💻' }
   ]
 
-  const hasMessages = messages.length > 0
-
-  const extractPdfFilename = (text) => {
-    if (typeof text !== 'string') return null
-    // Extremely liberal regex: just look for anything that looks like our report filenames
-    const match = text.match(/(report_[\w.-]+\.pdf)/i)
-    return match ? match[1] : null
+  const handleScanComplete = (results) => {
+    setScanResults(results)
+    setLoading(false)
   }
 
+  const handleScanStart = () => {
+    setLoading(false)
+    setScanResults(null)
+  }
 
+  const getSeverityColor = (severity) => {
+    const colors = {
+      'Critical': '#DC2626',
+      'High': '#EA580C',
+      'Medium': '#CA8A04',
+      'Low': '#2563EB',
+      'Info': '#6B7280'
+    }
+    return colors[severity] || colors['Info']
+  }
 
+  const getSeverityBadge = (severity) => {
+    return (
+      <span
+        className="severity-badge"
+        style={{ backgroundColor: getSeverityColor(severity) }}
+      >
+        {severity}
+      </span>
+    )
+  }
 
   return (
-    <div className={`app ${hasMessages ? 'chat-mode' : ''}`}>
+    <div className="app">
+      {/* Header */}
       <header className="header">
-        <div className="header-left">
-          <svg className="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-        </div>
-        <div className="status-badge">
-          <span className="status-dot"></span>
-          {status}
+        <div className="header-content">
+          <div className="logo">
+            <span className="logo-icon">🛡️</span>
+            <h1>PentPython</h1>
+            <span className="version">v2.0</span>
+          </div>
+          <div className="header-subtitle">
+            Multi-Scanner Security Platform
+          </div>
         </div>
       </header>
 
-      <main className="main-content">
-        <div className="logo-container">🛡️</div>
-
-        <div className="greeting">
-          <h1>Good to See You!<br />How Can I <span>Assist</span>?</h1>
-          <p>Your AI-powered security assistant, ready 24/7</p>
-        </div>
-
-        {hasMessages && (
-          <div className="messages-container">
-            {messages.map((msg, idx) => {
-              const pdfFile = msg.type === 'assistant' ? extractPdfFilename(msg.content) : null
-
-              return (
-                <div key={idx} className={`message ${msg.type}`}>
-                  <div className="message-label">
-                    {msg.type === 'user' ? '👤 You' : msg.type === 'error' ? '⚠️ Error' : '🤖 PentAgent'}
-                  </div>
-                  <div className="message-content" style={{ whiteSpace: 'pre-wrap' }}>
-                    {msg.content}
-                  </div>
-                  {pdfFile && (
-                    <div className="message-actions">
-                      <a
-                        href={`${API_URL}/download/${pdfFile}`}
-                        className="download-btn"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={pdfFile}
-                      >
-                        <span className="icon">📥</span>
-                        Download PDF Report
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {loading && (
-              <div className="loading">
-                <div className="loading-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <span>Analyzing...</span>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-
-        <div className="sidebar-header">
-          <div className="logo-container">
-            <div className="logo-spark"></div>
-            <h1>PentPython</h1>
-          </div>
-          <p className="subtitle">Unified Security AI <span style={{ fontSize: '0.7em', opacity: 0.5 }}>v1.2.0</span></p>
-        </div>
-
-        <div className="input-container">
-          <div className="input-header">
-            <div className="pro-badge">⚡ PentPython Security Console</div>
-            <div className="active-indicator">Active</div>
-          </div>
-          <div className="input-wrapper">
-            <span className="plus-icon">+</span>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything about security..."
-              disabled={loading}
-            />
-            <button className="send-btn" onClick={sendMessage} disabled={loading || !input.trim()}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" />
-              </svg>
+      {/* Main Content */}
+      <main className="main-container">
+        {/* Tab Navigation */}
+        <div className="tabs">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab(tab.id)
+                setScanResults(null)
+              }}
+            >
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-name">{tab.name}</span>
             </button>
-          </div>
+          ))}
         </div>
 
-        {!hasMessages && (
-          <div className="quick-actions">
-            {quickActions.map((action, idx) => (
-              <button
-                key={idx}
-                className="quick-btn"
-                onClick={() => setInput(action.action)}
-              >
-                <span className="icon">{action.icon}</span>
-                {action.text}
-              </button>
-            ))}
+        {/* Scanner Content */}
+        <div className="scanner-container">
+          <div className="scanner-panel">
+            {activeTab === 'website' && (
+              <WebsiteScanner
+                onScanComplete={handleScanComplete}
+                onScanStart={handleScanStart}
+                loading={loading}
+                setLoading={setLoading}
+              />
+            )}
+            {activeTab === 'apk' && (
+              <ApkScanner
+                onScanComplete={handleScanComplete}
+                onScanStart={handleScanStart}
+                loading={loading}
+                setLoading={setLoading}
+              />
+            )}
+            {activeTab === 'code' && (
+              <CodeScanner
+                onScanComplete={handleScanComplete}
+                onScanStart={handleScanStart}
+                loading={loading}
+                setLoading={setLoading}
+              />
+            )}
           </div>
-        )}
+
+          {/* Results Panel */}
+          {scanResults && (
+            <div className="results-panel">
+              <div className="results-header">
+                <h2>Scan Results</h2>
+                {scanResults.report_filename && (
+                  <a
+                    href={`${API_URL}/download/${scanResults.report_filename}`}
+                    className="download-btn"
+                    download
+                  >
+                    <span>📥</span>
+                    Download PDF Report
+                  </a>
+                )}
+              </div>
+
+              {/* Security Score */}
+              {scanResults.results.security_score !== undefined && (
+                <div className="security-score">
+                  <div className="score-circle">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke={scanResults.results.security_score >= 70 ? '#10b981' : scanResults.results.security_score >= 40 ? '#f59e0b' : '#ef4444'}
+                        strokeWidth="8"
+                        strokeDasharray={`${scanResults.results.security_score * 2.827} 283`}
+                        transform="rotate(-90 50 50)"
+                      />
+                    </svg>
+                    <div className="score-text">
+                      <span className="score-number">{scanResults.results.security_score}</span>
+                      <span className="score-label">Security Score</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Scan Info */}
+              <div className="scan-info">
+                {scanResults.results.files_scanned && (
+                  <div className="info-item">
+                    <span className="info-label">Files Scanned:</span>
+                    <span className="info-value">{scanResults.results.files_scanned}</span>
+                  </div>
+                )}
+                {scanResults.results.languages && scanResults.results.languages.length > 0 && (
+                  <div className="info-item">
+                    <span className="info-label">Languages:</span>
+                    <span className="info-value">{scanResults.results.languages.join(', ')}</span>
+                  </div>
+                )}
+                {scanResults.results.permissions && scanResults.results.permissions.length > 0 && (
+                  <div className="info-item">
+                    <span className="info-label">Permissions:</span>
+                    <span className="info-value">{scanResults.results.permissions.length}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Vulnerabilities */}
+              <div className="vulnerabilities-section">
+                <h3>Vulnerabilities Found: {scanResults.results.vulnerabilities?.length || 0}</h3>
+
+                {scanResults.results.vulnerabilities && scanResults.results.vulnerabilities.length > 0 ? (
+                  <div className="vulnerability-list">
+                    {scanResults.results.vulnerabilities.map((vuln, index) => (
+                      <div key={index} className="vulnerability-card">
+                        <div className="vuln-header">
+                          <div className="vuln-title">
+                            <span className="vuln-icon">⚠️</span>
+                            <span>{vuln.type}</span>
+                          </div>
+                          {getSeverityBadge(vuln.severity)}
+                        </div>
+                        <div className="vuln-description">{vuln.description}</div>
+                        {vuln.file && (
+                          <div className="vuln-file">
+                            <span className="file-icon">📄</span>
+                            {vuln.file}
+                          </div>
+                        )}
+                        <div className="vuln-remediation">
+                          <strong>Remediation:</strong> {vuln.remediation}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-vulnerabilities">
+                    <span className="success-icon">✅</span>
+                    <p>No vulnerabilities detected!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
+      {/* Footer */}
       <footer className="footer">
-        PentPython • AI Security Assistant
+        <p>PentPython Security Scanner • Powered by Advanced AI Analysis</p>
       </footer>
     </div>
   )

@@ -1,6 +1,7 @@
 import sys
 import os
-from agent import get_agent, FatalAPIError, MockPentAgent
+from agent import get_agent, MockPentAgent
+from exceptions import FatalAPIError
 from utils import print_system, console
 
 def main():

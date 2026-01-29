@@ -1,72 +1,43 @@
 import os
 import sys
-import re
+import shutil
 import logging
-import io
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Dict, Any
-from contextlib import asynccontextmanager, redirect_stdout, redirect_stderr
+from typing import Optional
+from contextlib import asynccontextmanager
 import uvicorn
-import shutil
+import aiofiles
+from datetime import datetime
 
 # Local imports
-from exceptions import FatalAPIError
-from agent import get_agent
+from scanners import WebsiteScanner, ApkScanner, CodeScanner
+from report_generator import SecurityReport
 
-
-
+# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dist_path = os.path.join(BASE_DIR, "ui", "dist")
+uploads_path = os.path.join(BASE_DIR, "uploads")
+reports_path = os.path.join(BASE_DIR, "reports")
 
-def strip_ansi_codes(text: str) -> str:
-    """Removes ANSI escape codes, box characters, and cleans output for web display."""
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    text = ansi_escape.sub('', text)
-    text = re.sub(r'file://[^\s;]+', '', text)
-    text = re.sub(r'8;id=\d+;[^\s]*', '', text)
-    text = re.sub(r'C:\\[^\s;]+', '', text)
-    text = re.sub(r'INFO\s+HTTP Request:.*\n?', '', text)
-    text = re.sub(r'DEBUG.*\n?', '', text)
-    box_chars = ['╭', '╮', '╰', '╯', '│', '─', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼']
-    for char in box_chars:
-        text = text.replace(char, '')
-    text = re.sub(r' {3,}', '  ', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    lines = text.split('\n')
-    cleaned_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not all(c in '-─═' for c in stripped):
-            cleaned_lines.append(line.rstrip())
-    return '\n'.join(cleaned_lines).strip()
-
-agent = None
-conversation_history = []
+# Create directories
+os.makedirs(uploads_path, exist_ok=True)
+os.makedirs(reports_path, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global agent
-    logger.info("Initializing Agent...")
-    try:
-        agent = get_agent()
-        logger.info(f"Agent initialized: {type(agent).__name__}")
-    except Exception as e:
-        logger.error(f"Failed to initialize agent: {e}")
+    logger.info("PentPython Multi-Scanner Platform Starting...")
     yield
+    logger.info("Shutting down...")
 
-app = FastAPI(title="PentPython API", version="1.1.0", lifespan=lifespan)
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "message": "Render service is up"}
+app = FastAPI(title="PentPython Security Scanner", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,118 +47,186 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ChatRequest(BaseModel):
-    message: str
+# Request/Response Models
+class WebsiteScanRequest(BaseModel):
+    url: str
 
-class ChatResponse(BaseModel):
-    response: str
-    logs: str
+class ScanResponse(BaseModel):
+    scan_id: str
     status: str
-
-@app.options("/{rest_of_path:path}")
-async def preflight_handler():
-    return {}
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    global agent, conversation_history
-    if not agent:
-        agent = get_agent()
-    
-    try:
-        # Agent now returns logs directly
-        logs = agent.run(request.message)
-        
-        if not logs:
-            logs = "Agent executed but produced no output."
-            
-        conversation_history.append({"user": request.message, "assistant": logs})
-        return ChatResponse(response=logs, logs=logs, status="success")
-    except Exception as e:
-        logger.error(f"Chat Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+    results: dict
+    report_filename: Optional[str] = None
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "agent": type(agent).__name__ if agent else "Not Initialized"}
+    return {"status": "healthy", "version": "2.0.0", "scanners": ["website", "apk", "code"]}
 
-@app.get("/history")
-async def get_history():
-    return {"history": conversation_history}
+@app.post("/scan/website", response_model=ScanResponse)
+async def scan_website(request: WebsiteScanRequest):
+    """Scan a website for vulnerabilities"""
+    try:
+        logger.info(f"Starting website scan for: {request.url}")
+        
+        # Run scanner
+        scanner = WebsiteScanner(request.url)
+        results = scanner.scan()
+        
+        # Generate PDF report
+        scan_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report = SecurityReport(
+            target=request.url,
+            scan_type="Website Security Scan",
+            vulnerabilities=results.get('vulnerabilities', [])
+        )
+        
+        report_files = report.save()
+        pdf_filename = os.path.basename(report_files['pdf'])
+        
+        return ScanResponse(
+            scan_id=scan_id,
+            status="completed",
+            results=results,
+            report_filename=pdf_filename
+        )
+    except Exception as e:
+        logger.error(f"Website scan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/reset")
-async def reset():
-    global agent, conversation_history
-    agent = get_agent()
-    conversation_history = []
-    return {"status": "reset_complete"}
+@app.post("/scan/apk", response_model=ScanResponse)
+async def scan_apk(file: UploadFile = File(...)):
+    """Scan an APK file for security vulnerabilities"""
+    try:
+        logger.info(f"Starting APK scan for: {file.filename}")
+        
+        # Validate file type
+        if not file.filename.endswith('.apk'):
+            raise HTTPException(status_code=400, detail="Only .apk files are allowed")
+        
+        # Save uploaded file
+        scan_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        apk_path = os.path.join(uploads_path, f"{scan_id}_{file.filename}")
+        
+        async with aiofiles.open(apk_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        # Run scanner
+        scanner = ApkScanner(apk_path)
+        results = scanner.scan()
+        
+        # Generate PDF report
+        report = SecurityReport(
+            target=file.filename,
+            scan_type="APK Security Analysis",
+            vulnerabilities=results.get('vulnerabilities', [])
+        )
+        
+        report_files = report.save()
+        pdf_filename = os.path.basename(report_files['pdf'])
+        
+        # Cleanup uploaded file
+        try:
+            os.remove(apk_path)
+        except:
+            pass
+        
+        return ScanResponse(
+            scan_id=scan_id,
+            status="completed",
+            results=results,
+            report_filename=pdf_filename
+        )
+    except Exception as e:
+        logger.error(f"APK scan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/debug")
-async def debug():
-    # Check for system dependencies
-    whois_exists = shutil.which("whois") is not None
-    dig_exists = shutil.which("dig") is not None
-    
-    return {
-        "status": "online",
-        "env": {
-            "openai_key": bool(os.getenv("OPENAI_API_KEY")),
-            "gemini_key": bool(os.getenv("GEMINI_API_KEY")),
-            "port": os.getenv("PORT", "8000")
-        },
-        "system": {
-            "cwd": os.getcwd(),
-            "base_dir": BASE_DIR,
-            "python": sys.version,
-            "whois": whois_exists,
-            "dig": dig_exists
-        },
-        "frontend": {
-            "dist_path": dist_path,
-            "dist_exists": os.path.exists(dist_path),
-            "index_exists": os.path.exists(os.path.join(dist_path, "index.html"))
-        }
-    }
+@app.post("/scan/project", response_model=ScanResponse)
+async def scan_project(file: UploadFile = File(...)):
+    """Scan a code project (ZIP) for vulnerabilities"""
+    try:
+        logger.info(f"Starting code project scan for: {file.filename}")
+        
+        # Validate file type
+        if not file.filename.endswith('.zip'):
+            raise HTTPException(status_code=400, detail="Only .zip files are allowed")
+        
+        # Save uploaded file
+        scan_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_path = os.path.join(uploads_path, f"{scan_id}_{file.filename}")
+        
+        async with aiofiles.open(zip_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        # Run scanner
+        scanner = CodeScanner(zip_path)
+        results = scanner.scan()
+        
+        # Generate PDF report
+        report = SecurityReport(
+            target=file.filename,
+            scan_type="Code Security Analysis",
+            vulnerabilities=results.get('vulnerabilities', [])
+        )
+        
+        report_files = report.save()
+        pdf_filename = os.path.basename(report_files['pdf'])
+        
+        # Cleanup uploaded file and extracted directory
+        try:
+            os.remove(zip_path)
+            extract_path = zip_path.replace('.zip', '_extracted')
+            if os.path.exists(extract_path):
+                shutil.rmtree(extract_path)
+        except:
+            pass
+        
+        return ScanResponse(
+            scan_id=scan_id,
+            status="completed",
+            results=results,
+            report_filename=pdf_filename
+        )
+    except Exception as e:
+        logger.error(f"Code scan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/download/{filename}")
-async def download_file(filename: str):
+async def download_report(filename: str):
+    """Download a generated report"""
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(os.getcwd(), safe_filename)
+    
     if os.path.exists(file_path) and (safe_filename.endswith(".pdf") or safe_filename.endswith(".md")):
         return FileResponse(path=file_path, filename=safe_filename, media_type='application/octet-stream')
-    raise HTTPException(status_code=404, detail="File not found")
+    
+    raise HTTPException(status_code=404, detail="Report not found")
 
-# --- STATIC FILE SERVING ---
-
+# Serve frontend
 @app.api_route("/", methods=["GET", "HEAD"])
 async def serve_index():
     index_file = os.path.join(dist_path, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {
-        "error": "Frontend build not found.",
-        "details": f"Checked path: {index_file}",
-        "advice": "Ensure ui/dist is uploaded to GitHub and not ignored."
-    }
+    return {"error": "Frontend not found", "path": dist_path}
 
-
+# Mount static assets
 assets_path = os.path.join(dist_path, "assets")
 if os.path.exists(assets_path):
     app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # API Protection
-    if full_path.startswith(("chat", "health", "history", "reset", "download", "debug")):
+    # API protection
+    if full_path.startswith(("scan", "health", "download")):
         raise HTTPException(status_code=404)
-        
+    
     # Check static files
     file_path = os.path.join(dist_path, full_path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
-        
-    # SPA Fallback
+    
+    # SPA fallback
     index_file = os.path.join(dist_path, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)

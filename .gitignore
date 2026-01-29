@@ -14,6 +14,12 @@ venv.bak/
 report_*.pdf
 report_*.md
 
+# Uploads and temp files
+uploads/
+reports/
+*.apk
+*.zip
+
 # Node / React
 ui/node_modules/
 ui/.env
