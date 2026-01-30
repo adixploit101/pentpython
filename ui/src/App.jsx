@@ -4,7 +4,7 @@ import './App.css'
 const API_URL = ''
 
 function App() {
-  const [activeScanner, setActiveScanner] = useState(null)
+  const [activeSection, setActiveSection] = useState('website')
   const [scanResults, setScanResults] = useState(null)
   const [loading, setLoading] = useState(false)
   const [url, setUrl] = useState('')
@@ -55,6 +55,7 @@ function App() {
       if (!response.ok) throw new Error(`Scan failed: ${response.statusText}`)
       const data = await response.json()
       setScanResults(data)
+      setFile(null)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -81,6 +82,7 @@ function App() {
       if (!response.ok) throw new Error(`Scan failed: ${response.statusText}`)
       const data = await response.json()
       setScanResults(data)
+      setFile(null)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -93,266 +95,292 @@ function App() {
       'Critical': '#ef4444',
       'High': '#f97316',
       'Medium': '#eab308',
-      'Low': '#3b82f6',
-      'Info': '#6b7280'
+      'Low': '#3b82f6'
     }
-    return colors[severity] || colors['Info']
+    return colors[severity] || '#6b7280'
+  }
+
+  const getSeverityIcon = (severity) => {
+    if (severity === 'Critical' || severity === 'High') return '🔴'
+    if (severity === 'Medium') return '🟡'
+    return '🔵'
   }
 
   return (
     <div className="app">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-icon">🛡️</div>
-          <span className="logo-text">PentPython</span>
+          <span>PentPython</span>
         </div>
 
         <nav className="nav">
           <div className="nav-item active">
-            <span className="nav-icon">📊</span>
+            <span className="icon">📊</span>
             <span>Dashboard</span>
           </div>
           <div className="nav-item">
-            <span className="nav-icon">🔍</span>
-            <span>Scanners</span>
+            <span className="icon">🧠</span>
+            <span>Threat Intelligence</span>
           </div>
           <div className="nav-item">
-            <span className="nav-icon">📈</span>
+            <span className="icon">📈</span>
             <span>Analytics</span>
           </div>
           <div className="nav-item">
-            <span className="nav-icon">⚙️</span>
+            <span className="icon">⚙️</span>
             <span>Settings</span>
+          </div>
+          <div className="nav-item">
+            <span className="icon">ℹ️</span>
+            <span>Information</span>
           </div>
         </nav>
 
-        <div className="sidebar-footer">
-          <div className="upgrade-card">
-            <h3>Try the paid version!</h3>
-            <p>Upgrade to the full version and stay one step ahead of every cyber threat.</p>
-            <button className="upgrade-btn">Join today</button>
-          </div>
+        <div className="upgrade-box">
+          <h3>Try the paid version!</h3>
+          <p>Upgrade to the full version and stay one step ahead of every cyber threat.</p>
+          <button className="upgrade-btn">Join today</button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="main-content">
-        <header className="header">
-          <div className="search-bar">
+      <main className="main">
+        <header className="topbar">
+          <div className="search-container">
             <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Search" />
+            <input type="text" placeholder="Search" className="search-input" />
+            <button className="filter-btn">
+              <span>🎯</span>
+              <span>Filter</span>
+            </button>
           </div>
-          <div className="header-actions">
-            <button className="icon-btn">🔔</button>
-            <button className="icon-btn">☀️</button>
-            <button className="icon-btn">🌙</button>
-            <div className="user-profile">
-              <img src="https://ui-avatars.com/api/?name=Security+User&background=d97706&color=fff" alt="User" />
-              <span>Security User</span>
+          <div className="topbar-right">
+            <button className="icon-button">🔔</button>
+            <button className="icon-button active">☀️</button>
+            <button className="icon-button">🌙</button>
+            <div className="user-menu">
+              <img src="https://ui-avatars.com/api/?name=Security+Admin&background=d97706&color=000" alt="User" />
+              <div>
+                <div className="user-name">Security Admin</div>
+                <div className="user-status">● Verified</div>
+              </div>
             </div>
           </div>
         </header>
 
-        <div className="content">
-          <h1 className="page-title">Security Scanners</h1>
-
-          {/* Scanner Cards Grid */}
-          <div className="scanner-grid">
-            {/* Website Scanner Card */}
-            <div className="scanner-card">
-              <div className="card-header">
-                <h2>🌐 Website Scanner</h2>
-                <p>Comprehensive web vulnerability assessment</p>
-              </div>
-              <div className="card-body">
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="https://example.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  disabled={loading && activeScanner === 'website'}
-                />
-                <button
-                  className="scan-btn"
-                  onClick={() => {
-                    setActiveScanner('website')
-                    handleWebsiteScan()
-                  }}
-                  disabled={loading && activeScanner === 'website'}
-                >
-                  {loading && activeScanner === 'website' ? 'Scanning...' : 'Start Scan'}
-                </button>
-                <div className="features">
-                  <span className="feature-tag">SQL Injection</span>
-                  <span className="feature-tag">XSS</span>
-                  <span className="feature-tag">CSRF</span>
-                  <span className="feature-tag">SSL/TLS</span>
-                </div>
-              </div>
+        <div className="content-grid">
+          {/* Main Scanner Section */}
+          <div className="main-section">
+            <div className="section-tabs">
+              <button
+                className={activeSection === 'website' ? 'tab active' : 'tab'}
+                onClick={() => { setActiveSection('website'); setScanResults(null); setError(''); }}
+              >
+                Website Scanner
+              </button>
+              <button
+                className={activeSection === 'apk' ? 'tab active' : 'tab'}
+                onClick={() => { setActiveSection('apk'); setScanResults(null); setError(''); }}
+              >
+                APK Scanner
+              </button>
+              <button
+                className={activeSection === 'code' ? 'tab active' : 'tab'}
+                onClick={() => { setActiveSection('code'); setScanResults(null); setError(''); }}
+              >
+                Code Scanner
+              </button>
             </div>
 
-            {/* APK Scanner Card */}
-            <div className="scanner-card">
-              <div className="card-header">
-                <h2>📱 APK Scanner</h2>
-                <p>Android application security analysis</p>
-              </div>
-              <div className="card-body">
-                <div className="file-upload">
+            {/* Scanner Input Area */}
+            <div className="scanner-input">
+              {activeSection === 'website' && (
+                <div className="input-group">
+                  <input
+                    type="text"
+                    placeholder="Enter website URL (e.g., https://example.com)"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="url-input"
+                  />
+                  <button onClick={handleWebsiteScan} disabled={loading} className="scan-button">
+                    {loading ? 'Scanning...' : 'Start Scan'}
+                  </button>
+                </div>
+              )}
+
+              {activeSection === 'apk' && (
+                <div className="input-group">
                   <input
                     type="file"
                     accept=".apk"
                     onChange={(e) => setFile(e.target.files[0])}
-                    id="apk-file"
+                    id="apk-upload"
                     style={{ display: 'none' }}
                   />
-                  <label htmlFor="apk-file" className="file-label">
-                    {file && activeScanner === 'apk' ? file.name : 'Choose APK file'}
+                  <label htmlFor="apk-upload" className="file-input-label">
+                    {file ? file.name : 'Choose APK file'}
                   </label>
+                  <button onClick={handleApkScan} disabled={loading || !file} className="scan-button">
+                    {loading ? 'Analyzing...' : 'Analyze APK'}
+                  </button>
                 </div>
-                <button
-                  className="scan-btn"
-                  onClick={() => {
-                    setActiveScanner('apk')
-                    handleApkScan()
-                  }}
-                  disabled={loading && activeScanner === 'apk'}
-                >
-                  {loading && activeScanner === 'apk' ? 'Analyzing...' : 'Analyze APK'}
-                </button>
-                <div className="features">
-                  <span className="feature-tag">Hardcoded Secrets</span>
-                  <span className="feature-tag">Permissions</span>
-                  <span className="feature-tag">Weak Crypto</span>
-                  <span className="feature-tag">Network Security</span>
-                </div>
-              </div>
-            </div>
+              )}
 
-            {/* Code Scanner Card */}
-            <div className="scanner-card">
-              <div className="card-header">
-                <h2>💻 Code Scanner</h2>
-                <p>Static analysis for Top 10 vulnerabilities</p>
-              </div>
-              <div className="card-body">
-                <div className="file-upload">
+              {activeSection === 'code' && (
+                <div className="input-group">
                   <input
                     type="file"
                     accept=".zip"
                     onChange={(e) => setFile(e.target.files[0])}
-                    id="code-file"
+                    id="code-upload"
                     style={{ display: 'none' }}
                   />
-                  <label htmlFor="code-file" className="file-label">
-                    {file && activeScanner === 'code' ? file.name : 'Choose ZIP file'}
+                  <label htmlFor="code-upload" className="file-input-label">
+                    {file ? file.name : 'Choose ZIP file'}
                   </label>
-                </div>
-                <button
-                  className="scan-btn"
-                  onClick={() => {
-                    setActiveScanner('code')
-                    handleCodeScan()
-                  }}
-                  disabled={loading && activeScanner === 'code'}
-                >
-                  {loading && activeScanner === 'code' ? 'Analyzing...' : 'Analyze Code'}
-                </button>
-                <div className="features">
-                  <span className="feature-tag">Rate Limiting</span>
-                  <span className="feature-tag">API Keys</span>
-                  <span className="feature-tag">CORS</span>
-                  <span className="feature-tag">Input Validation</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="error-banner">
-              <span>⚠️</span>
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Results Section */}
-          {scanResults && (
-            <div className="results-section">
-              <div className="results-header">
-                <h2>Scan Results</h2>
-                {scanResults.report_filename && (
-                  <a
-                    href={`${API_URL}/download/${scanResults.report_filename}`}
-                    className="download-btn"
-                    download
-                  >
-                    📥 Download PDF Report
-                  </a>
-                )}
-              </div>
-
-              {/* Security Score */}
-              {scanResults.results.security_score !== undefined && (
-                <div className="score-card">
-                  <div className="score-circle">
-                    <svg viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="40" fill="none" stroke="#2a2a2a" strokeWidth="8" />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="#d97706"
-                        strokeWidth="8"
-                        strokeDasharray={`${scanResults.results.security_score * 2.51} 251`}
-                        transform="rotate(-90 50 50)"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="score-value">
-                      <span className="score-number">{scanResults.results.security_score}</span>
-                      <span className="score-label">Security Score</span>
-                    </div>
-                  </div>
+                  <button onClick={handleCodeScan} disabled={loading || !file} className="scan-button">
+                    {loading ? 'Analyzing...' : 'Analyze Code'}
+                  </button>
                 </div>
               )}
+            </div>
 
-              {/* Vulnerabilities */}
-              <div className="vulnerabilities">
-                <h3>Vulnerabilities Found: {scanResults.results.vulnerabilities?.length || 0}</h3>
-                {scanResults.results.vulnerabilities && scanResults.results.vulnerabilities.length > 0 ? (
-                  <div className="vuln-list">
-                    {scanResults.results.vulnerabilities.map((vuln, index) => (
-                      <div key={index} className="vuln-card" style={{ borderLeftColor: getSeverityColor(vuln.severity) }}>
-                        <div className="vuln-header">
-                          <span className="vuln-title">{vuln.type}</span>
-                          <span
-                            className="vuln-severity"
-                            style={{ backgroundColor: getSeverityColor(vuln.severity) }}
-                          >
-                            {vuln.severity}
+            {error && (
+              <div className="error-box">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Results Table */}
+            {scanResults && scanResults.results.vulnerabilities && (
+              <div className="results-table-container">
+                <table className="results-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Severity</th>
+                      <th>Description</th>
+                      <th>File</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scanResults.results.vulnerabilities.map((vuln, idx) => (
+                      <tr key={idx}>
+                        <td>{vuln.type}</td>
+                        <td>
+                          <span className="severity-badge" style={{ background: getSeverityColor(vuln.severity) }}>
+                            {getSeverityIcon(vuln.severity)} {vuln.severity}
                           </span>
-                        </div>
-                        <p className="vuln-desc">{vuln.description}</p>
-                        {vuln.file && <p className="vuln-file">📄 {vuln.file}</p>}
-                        <div className="vuln-fix">
-                          <strong>Fix:</strong> {vuln.remediation}
-                        </div>
-                      </div>
+                        </td>
+                        <td className="desc-cell">{vuln.description}</td>
+                        <td className="file-cell">{vuln.file || 'N/A'}</td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {scanResults && scanResults.results.vulnerabilities && scanResults.results.vulnerabilities.length === 0 && (
+              <div className="no-results">
+                <span className="check-icon">✅</span>
+                <p>No vulnerabilities detected</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar Stats */}
+          <div className="stats-sidebar">
+            {scanResults && (
+              <>
+                <div className="stat-card">
+                  <h3>Scan Summary</h3>
+                  <div className="stat-row">
+                    <span>Total Findings</span>
+                    <span className="stat-value">{scanResults.results.vulnerabilities?.length || 0}</span>
                   </div>
-                ) : (
-                  <div className="no-vulns">
-                    <span className="success-icon">✅</span>
-                    <p>No vulnerabilities detected!</p>
+                  {scanResults.results.security_score !== undefined && (
+                    <div className="stat-row">
+                      <span>Security Score</span>
+                      <span className="stat-value">{scanResults.results.security_score}/100</span>
+                    </div>
+                  )}
+                  {scanResults.results.files_scanned && (
+                    <div className="stat-row">
+                      <span>Files Scanned</span>
+                      <span className="stat-value">{scanResults.results.files_scanned}</span>
+                    </div>
+                  )}
+                  {scanResults.report_filename && (
+                    <a href={`${API_URL}/download/${scanResults.report_filename}`} className="download-link" download>
+                      📥 Download PDF Report
+                    </a>
+                  )}
+                </div>
+
+                {scanResults.results.security_score !== undefined && (
+                  <div className="gauge-card">
+                    <div className="gauge">
+                      <svg viewBox="0 0 200 120">
+                        <defs>
+                          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="#ef4444" />
+                            <stop offset="50%" stopColor="#eab308" />
+                            <stop offset="100%" stopColor="#10b981" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M 20 100 A 80 80 0 0 1 180 100"
+                          fill="none"
+                          stroke="#2a2a2a"
+                          strokeWidth="12"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M 20 100 A 80 80 0 0 1 180 100"
+                          fill="none"
+                          stroke="url(#gaugeGradient)"
+                          strokeWidth="12"
+                          strokeLinecap="round"
+                          strokeDasharray={`${scanResults.results.security_score * 2.51} 251`}
+                        />
+                        <circle cx="100" cy="100" r="6" fill="#d97706" />
+                      </svg>
+                      <div className="gauge-value">
+                        <div className="gauge-number">{scanResults.results.security_score}</div>
+                        <div className="gauge-label">Score</div>
+                      </div>
+                    </div>
                   </div>
                 )}
+              </>
+            )}
+
+            {!scanResults && (
+              <div className="stat-card">
+                <h3>Getting Started</h3>
+                <p className="help-text">
+                  Select a scanner type and provide the required input to begin security analysis.
+                </p>
+                <div className="scanner-info">
+                  <div className="info-item">
+                    <strong>🌐 Website Scanner</strong>
+                    <span>SQL injection, XSS, CSRF, SSL/TLS analysis</span>
+                  </div>
+                  <div className="info-item">
+                    <strong>📱 APK Scanner</strong>
+                    <span>Hardcoded secrets, permissions, weak crypto</span>
+                  </div>
+                  <div className="info-item">
+                    <strong>💻 Code Scanner</strong>
+                    <span>Top 10 code vulnerabilities detection</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
     </div>
