@@ -9,6 +9,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [url, setUrl] = useState('')
   const [file, setFile] = useState(null)
+  const [playStoreUrl, setPlayStoreUrl] = useState('')
+  const [apkInputType, setApkInputType] = useState('file') // 'file' or 'playstore'
   const [error, setError] = useState('')
 
   const handleWebsiteScan = async () => {
@@ -37,8 +39,12 @@ function App() {
   }
 
   const handleApkScan = async () => {
-    if (!file) {
+    if (apkInputType === 'file' && !file) {
       setError('Please upload an APK file')
+      return
+    }
+    if (apkInputType === 'playstore' && !playStoreUrl.trim()) {
+      setError('Please enter a Google Play Store URL')
       return
     }
     setError('')
@@ -46,16 +52,29 @@ function App() {
     setScanResults(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const response = await fetch(`${API_URL}/scan/apk`, {
-        method: 'POST',
-        body: formData
-      })
-      if (!response.ok) throw new Error(`Scan failed: ${response.statusText}`)
-      const data = await response.json()
-      setScanResults(data)
-      setFile(null)
+      if (apkInputType === 'file') {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await fetch(`${API_URL}/scan/apk`, {
+          method: 'POST',
+          body: formData
+        })
+        if (!response.ok) throw new Error(`Scan failed: ${response.statusText}`)
+        const data = await response.json()
+        setScanResults(data)
+        setFile(null)
+      } else {
+        // Play Store URL scanning
+        const response = await fetch(`${API_URL}/scan/apk/playstore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ play_store_url: playStoreUrl })
+        })
+        if (!response.ok) throw new Error(`Scan failed: ${response.statusText}`)
+        const data = await response.json()
+        setScanResults(data)
+        setPlayStoreUrl('')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -110,8 +129,8 @@ function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="logo">
-          <div className="logo-icon">🛡️</div>
-          <span>PentPython</span>
+          <img src="/securescan_logo.png" alt="SecureScan" className="logo-icon" />
+          <span>SecureScan</span>
         </div>
 
         <nav className="nav">
@@ -210,20 +229,52 @@ function App() {
               )}
 
               {activeSection === 'apk' && (
-                <div className="input-group">
-                  <input
-                    type="file"
-                    accept=".apk"
-                    onChange={(e) => setFile(e.target.files[0])}
-                    id="apk-upload"
-                    style={{ display: 'none' }}
-                  />
-                  <label htmlFor="apk-upload" className="file-input-label">
-                    {file ? file.name : 'Choose APK file'}
-                  </label>
-                  <button onClick={handleApkScan} disabled={loading || !file} className="scan-button">
-                    {loading ? 'Analyzing...' : 'Analyze APK'}
-                  </button>
+                <div className="apk-input-container">
+                  <div className="input-type-toggle">
+                    <button
+                      className={apkInputType === 'file' ? 'toggle-btn active' : 'toggle-btn'}
+                      onClick={() => { setApkInputType('file'); setError(''); }}
+                    >
+                      📁 Upload APK
+                    </button>
+                    <button
+                      className={apkInputType === 'playstore' ? 'toggle-btn active' : 'toggle-btn'}
+                      onClick={() => { setApkInputType('playstore'); setError(''); }}
+                    >
+                      🏪 Play Store Link
+                    </button>
+                  </div>
+
+                  {apkInputType === 'file' ? (
+                    <div className="input-group">
+                      <input
+                        type="file"
+                        accept=".apk"
+                        onChange={(e) => setFile(e.target.files[0])}
+                        id="apk-upload"
+                        style={{ display: 'none' }}
+                      />
+                      <label htmlFor="apk-upload" className="file-input-label">
+                        {file ? file.name : 'Choose APK file'}
+                      </label>
+                      <button onClick={handleApkScan} disabled={loading || !file} className="scan-button">
+                        {loading ? 'Analyzing...' : 'Analyze APK'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        placeholder="https://play.google.com/store/apps/details?id=..."
+                        value={playStoreUrl}
+                        onChange={(e) => setPlayStoreUrl(e.target.value)}
+                        className="url-input"
+                      />
+                      <button onClick={handleApkScan} disabled={loading} className="scan-button">
+                        {loading ? 'Analyzing...' : 'Analyze App'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
