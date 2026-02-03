@@ -33,11 +33,11 @@ os.makedirs(reports_path, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("PentPython Multi-Scanner Platform Starting...")
+    logger.info("SecureScan Multi-Scanner Platform Starting...")
     yield
     logger.info("Shutting down...")
 
-app = FastAPI(title="PentPython Security Scanner", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="SecureScan Security Scanner", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -152,6 +152,43 @@ async def scan_apk(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"APK scan error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class PlayStoreScanRequest(BaseModel):
+    play_store_url: str
+
+@app.post("/scan/apk/playstore", response_model=ScanResponse)
+async def scan_apk_playstore(request: PlayStoreScanRequest):
+    """Scan an APK from Google Play Store URL"""
+    try:
+        logger.info(f"Starting Play Store APK scan for: {request.play_store_url}")
+        
+        # For now, return a message that this feature is coming soon
+        # In production, you would:
+        # 1. Extract package ID from Play Store URL
+        # 2. Download APK using tools like gplaycli or apkeep
+        # 3. Run the same APK scanner
+        
+        scan_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Placeholder response
+        results = {
+            'message': 'Play Store scanning coming soon!',
+            'play_store_url': request.play_store_url,
+            'status': 'Feature in development',
+            'vulnerabilities': [],
+            'security_score': 0
+        }
+        
+        return ScanResponse(
+            scan_id=scan_id,
+            status="pending",
+            results=results,
+            report_filename=None
+        )
+    except Exception as e:
+        logger.error(f"Play Store scan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/scan/project", response_model=ScanResponse)
 async def scan_project(file: UploadFile = File(...)):
